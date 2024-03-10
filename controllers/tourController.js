@@ -10,48 +10,7 @@ exports.aliasTopFiveTour = (req, res, next) => {
 
 exports.getTours = async (req, res) => {
   try {
-    // 1A) Filtering
-    // const queryObj = { ...req.query }
-    // const excludedFields = ['page', 'limit', 'fields', 'sort']
-    // excludedFields.forEach(el => delete queryObj[el])
-
-    // // 1B) Advance filtering
-    // let queryStr = JSON.stringify(queryObj)
-    // queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => $${match})
-
-
-    // let query = Tour.find(JSON.parse(queryStr));
-
-    // 2) SORTNG
-    // if (req.query.sort) {
-    //   console.log(req.query.sort)
-    //   const sortBy = req.query.sort.split(',').join(" ")
-    //   query = query.sort(sortBy)
-    // }
-
-    // 3)FIELD LIMITING
-    // if (req.query.fields) {
-    //   const fields = req.query.fields.split(',').join(' ');
-    //   query = query.select(fields);
-    // } else {
-    //   query = query.select('-__v');
-    // }
-
-    // 4) PAGINATION
-    // const page = req.query.page * 1 || 1;
-    // const limit = req.query.limit * 1 || 100;
-    // const skip = (page - 1) * limit
-
-    // // page=2&limit=10 ====> 1-10 ==> PAGE 1, 11-20 ==> PAGE 2
-
-    // query = query.skip(skip).limit(limit)
-
-    // if (req.query.page) {
-    //   const numTours = await Tour.countDocuments();
-    //   if (skip >= numTours) throw new Error("This page doesn't exist")
-    // } 
-
-    const features = new APIFeatures(Tour.find(), req.query).filter().sort().limitFields().pagination()
+    const features = new APIFeatures(Tour.find(), req.query).filter().sort().limitFields().paginate()
     const tours = await features.query
 
 
@@ -141,5 +100,41 @@ exports.deleteTour = async (req, res) => {
     res.status(404).json({
       message: error.message
     })
+  }
+}
+
+exports.getTourStats = async (req, res) => {
+  try {
+    const stats = await Tour.aggregate([
+      {
+        $match: { ratingsAverage: { $gte: 4.5 } }
+      },
+
+      {
+        $group: {
+          _id: '$difficulty',
+          numTours: { $sum: 1 },
+          numRatings: { $sum: '$ratingsQuantity'},
+          avgRating: { $avg: '$ratingsAverage' },
+          maxPrice: { $max: '$price' },
+          minPrice: { $min: '$price' },
+          avgPrice: { $avg: '$price' }
+        }
+      },
+      {
+        $sort: { avgRating: 1}
+      },
+      // {
+      //   $match: { _id: { $ne: 'easy'}}
+      // }
+    ])
+    res.status(200).json({
+      status: "Success",
+      data: {
+        stats
+      }
+    })
+  } catch (error) {
+    console.log(error)
   }
 }
